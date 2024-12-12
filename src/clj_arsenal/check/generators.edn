@@ -1,0 +1,2 @@
+{:string clj-arsenal.check.generators/string
+ :integer clj-arsenal.check.generators/integer}
