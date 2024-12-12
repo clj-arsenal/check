@@ -1,16 +1,9 @@
 (ns ^:no-doc clj-arsenal.check.common
   (:require
-   [clj-arsenal.check.protocols :as protocols]
+   [clj-arsenal.basis.protocols.chain]
    [clj-arsenal.check :as-alias check]
    #?(:clj [clojure.pprint :refer [pprint]]
       :cljs [cljs.pprint :refer [pprint]])))
-
-(defn try-catch
-  [try-fn catch-fn]
-  (try
-    (try-fn)
-    (catch #?(:clj Throwable :cljs :default) ex
-      (catch-fn ex))))
 
 (def ^:private ansi-term-codes
   {:reset "\u001B[0m"
@@ -50,13 +43,6 @@
              "\n"
              (with-out-str (pprint (ex-data (::check/error report))))
              (.-stack (::check/error report))))))))
-
-(defn fail
-  [error]
-  (reify protocols/AsyncChain
-    (async-chain-fn [_]
-      (fn [context complete]
-        (complete (assoc context ::check/error error))))))
 
 (defn report
   [context]

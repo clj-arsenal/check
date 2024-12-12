@@ -5,7 +5,8 @@
    [clojure.repl :as repl]
    [clojure.edn :as edn]
    [clj-arsenal.check.common :as common]
-   [clj-arsenal.check.protocols :as protocols])
+   [clj-arsenal.basis.protocols.chain :refer [chain]]
+   [clj-arsenal.basis :as b])
   (:import
    java.net.URL
    java.io.PushbackReader))
@@ -56,26 +57,29 @@
   [gen-key & {:as gen-opts}]
   `(clojure.core/first (samps ~gen-key ~(assoc gen-opts :limit 1))))
 
-(defmacro ^:no-doc async-chain-forms
+(defmacro ^:no-doc chain-forms*
   [forms context callback]
   (if (empty? forms)
     `(~callback ~context)
-    `((protocols/async-chain-fn
-        (common/try-catch
-          (fn [] ~(first forms))
-          (fn [error#] (common/fail error#))))
-      ~context
-      (fn [next-context#]
-        (if (::error next-context#)
-          (~callback next-context#)
-          (async-chain-forms ~(rest forms) next-context# ~callback))))))
+      `(let [context# ~context]
+         (chain
+           (b/try-fn
+             (fn []
+               ~(first forms))
+             :catch
+             (fn [error#]
+               error#))
+           (fn [next-value#]
+             (if (b/error? next-value#)
+               (~callback (assoc context# ::error next-value#))
+               (chain-forms* ~(rest forms) context# ~callback)))))))
 
 (defmacro check
   [check-key & body]
   (when (check-ns? (str *ns*))
     `(do
        (swap! common/!status assoc ~check-key ::pending)
-       (async-chain-forms ~body
+       (chain-forms* ~body
          {::key ~check-key
           ::reporter ~(if &env
                         `(clojure.core/resolve '~reporter)
