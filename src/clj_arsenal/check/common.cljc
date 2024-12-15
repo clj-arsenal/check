@@ -2,6 +2,7 @@
   (:require
    [clj-arsenal.basis.protocols.chain]
    [clj-arsenal.check :as-alias check]
+   [clj-arsenal.basis]
    #?(:clj [clojure.pprint :refer [pprint]]
       :cljs [cljs.pprint :refer [pprint]])))
 
