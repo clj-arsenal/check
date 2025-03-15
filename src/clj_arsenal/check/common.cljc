@@ -1,57 +1,68 @@
 (ns ^:no-doc clj-arsenal.check.common
   (:require
-   [clj-arsenal.basis.protocols.chain]
-   [clj-arsenal.check :as-alias check]
-   [clj-arsenal.basis]
-   #?(:clj [clojure.pprint :refer [pprint]]
-      :cljs [cljs.pprint :refer [pprint]])))
+   [clj-arsenal.log :refer [log] :as log]
+   [clj-arsenal.basis :as b]
+   [clojure.string :as str]
+   #?(:cljd ["dart:io" :as io])))
 
-(def ^:private ansi-term-codes
-  {:reset "\u001B[0m"
-   :red "\u001B[31m"})
+(defonce !status (atom {}))
 
-(def !status (atom {}))
-
-#?(:clj
-   (defn default-reporter
-     [report]
-     (when (= (::check/status report) ::check/failure)
-       (println
-         (:red ansi-term-codes)
-         "Check Failed" (::check/key report)
-         (:reset ansi-term-codes))
-         (pprint (::check/error report))))
-
-   :cljs
-   (let [has-devtools? (boolean (find-ns 'devtools.formatters.core))
-         in-browser? (boolean (.-document js/globalThis))]
-     (defn default-reporter
-       [report]
-       (when (= (::check/status report) ::check/failure)
-         (cond
-           has-devtools?
-           (js/console.error "Check Failed " (::check/key report) "\n" (::check/error report))
-           
-           in-browser?
-           (js/console.error
-             "Check Failed " (pr-str (::check/key report)) "\n"
-             (with-out-str (pprint (ex-data (::check/error report))))
-             (.-stack (::check/error report)))
-           
-           :else
-           (js/console.error
-             (:red ansi-term-codes) "Check Failed " (pr-str (::check/key report)) (:reset ansi-term-codes)
-             "\n"
-             (with-out-str (pprint (ex-data (::check/error report))))
-             (.-stack (::check/error report))))))))
+(defn default-reporter
+  [report]
+  (when (= (:clj-arsenal.check/status report) :clj-arsenal.check/failure)
+    (log :error
+      :msg (str "Check Failed " (:clj-arsenal.check/key report))
+      :ex (:clj-arsenal.check/error report)
+      ::log/skip-loc true)))
 
 (defn report
   [context]
-  (let [status (if (some? (::check/error context)) ::check/failure ::check/success)]
-    ((::check/reporter context)
+  (let [status (if (some? (:clj-arsenal.check/error context)) :clj-arsenal.check/failure :clj-arsenal.check/success)]
+    ((:clj-arsenal.check/reporter context)
      (cond->
-       {::check/status status
-        ::check/key (::check/key context)}
-       (= ::check/failure status)
-       (assoc ::check/error (::check/error context))))
-    (swap! !status assoc (::check/key context) status)))
+       {:clj-arsenal.check/status status
+        :clj-arsenal.check/key (:clj-arsenal.check/key context)}
+       (= :clj-arsenal.check/failure status)
+       (assoc :clj-arsenal.check/error (:clj-arsenal.check/error context))))
+    (swap! !status assoc (:clj-arsenal.check/key context) status)))
+
+(defn await-all-checks
+  []
+  (b/chainable
+    (fn [continue]
+      (let
+        [watch-key (gensym)
+         
+         on-status
+         (fn [status]
+           (let
+             [{passed :clj-arsenal.check/success
+               failed :clj-arsenal.check/failure
+               pending :clj-arsenal.check/pending}
+              (group-by val status)]
+             (when (empty? pending)
+               (remove-watch !status watch-key)
+               (continue {:clj-arsenal.check/passed (map key passed) :clj-arsenal.check/failed (map key failed)}))))]
+        (add-watch !status watch-key (fn [_ _ _ status] (on-status status)))
+        (on-status @!status)))))
+
+(defn report-all-checks-and-exit!
+  []
+  (b/chain
+    (await-all-checks)
+    (fn [{passed :clj-arsenal.check/passed failed :clj-arsenal.check/failed :as x}]
+      (cond
+        (seq failed)
+        (binding
+          [*out* #?(:cljd io/stderr :clj *err* :cljs *out*)]
+          (print
+            "\u001b[31mThe following checks failed:\n"
+            (str/join "\n" (map #(str "  " %) failed))
+            "\n\u001b[0m\n")
+          #?(:clj (flush))
+          #?(:cljd (io/exit 1) :clj (System/exit 1) :cljs (js/process.exit 1)))
+        
+        :else
+        (do
+          (print "\u001b[32mAll " (count passed) " checks passed.\n\u001b[0m")
+          #?(:cljd (io/exit 0) :clj (System/exit 0) :cljs (js/process.exit 0)))))))

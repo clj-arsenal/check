@@ -1,0 +1,70 @@
+(ns clj-arsenal.check
+  (:require
+   [clj-arsenal.basis :as b]
+   [clj-arsenal.check.common :as common])
+  (:host-ns
+   (:require
+    [clj-arsenal.check.macro-common :as macro-common]
+    [clojure.walk :as walk])))
+
+(def !status common/!status)
+(def !status common/!status)
+(def await-all-checks common/await-all-checks)
+(def report-all-checks-and-exit! common/report-all-checks-and-exit!)
+
+(defn ^:macro-support check-ns?
+  [env]
+  #?(:cljd/clj-host
+     (macro-common/check-ns? (str (get-in env [:nses :current-ns])))
+
+     :default
+     false))
+
+(defonce ^:macro-support !check-funs (atom {}))
+
+(defmacro check
+  [check-key & body]
+  (when (check-ns? &env)
+    (let [check-fn-name (or (get @!check-funs check-key) (gensym "check-"))
+          check-fn-ns (get-in &env [:nses :current-ns])]
+      (swap! !check-funs assoc check-key (symbol (name check-fn-ns) (name check-fn-name)))
+      #?(:cljd/clj-host
+         (binding [macro-common/*expand-host* :cljd]
+           `(defn ~check-fn-name []
+              ~(macro-common/expand-check check-key body)))))))
+
+(defmacro samps
+  [gen-key & {:as gen-opts}]
+  #?(:cljd/clj-host
+     (binding [macro-common/*expand-host* :cljd]
+       (macro-common/expand-samps gen-key gen-opts))))
+
+(defmacro samp
+  [gen-key & {:as gen-opts}]
+  #?(:cljd/clj-host
+     (binding [macro-common/*expand-host* :cljd]
+       (macro-common/expand-samp gen-key gen-opts))))
+
+(defmacro when-check
+  [& body]
+  (when (check-ns? &env)
+    `(do ~@body)))
+
+(defmacro run
+  []
+  `(do
+     ~@(map
+         (fn [fun-sym]
+           `(~fun-sym))
+         (vals @!check-funs))
+     nil))
+
+(defn expect
+  [f & args]
+  (when-not (apply f args)
+    (throw
+      (b/err
+        :p ::expectation-unsatisfied
+        :msg "Expectation Unsatisfied"
+        ::expect-fun (str f)
+        ::expect-args args))))
