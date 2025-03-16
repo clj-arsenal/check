@@ -1,34 +1,50 @@
 (ns clj-arsenal.check
   (:require
-    [clj-arsenal.basis :as b])
+   [clj-arsenal.basis :as b]
+   [clj-arsenal.check.common :as common])
   (:host-ns
-    [clj-arsenal.basis.macro-common :as macro-common]))
+   (:require
+    [clj-arsenal.check.macro-common :as macro-common]
+    [clojure.walk :as walk])))
 
-(defmacro samps
-  [gen-key & {:as gen-opts}]
-  (binding [macro-common/*expand-host* :cljd]
-    (macro-common/expand-samps gen-key gen-opts)))
+(def !status common/!status)
 
-(defmacro samp
-  [gen-key & {:as gen-opts}]
-  (binding [macro-common/*expand-host* :cljd]
-    (macro-common/expand-samp gen-key gen-opts)))
+(defn ^:macro-support check-ns?
+  [env]
+  #?(:cljd/clj-host
+     (macro-common/check-ns? (str (get-in env [:nses :current-ns])))
 
-(defonce ^:macro-support !check-funs (atom #{}))
+     :default
+     false))
+
+(defonce ^:macro-support !check-funs (atom {}))
 
 (defmacro check
   [check-key & body]
-  (when (macro-common/check-ns? (str *ns*))
-    (binding [macro-common/*expand-host* :cljd]
-      (let [check-fn-name (gensym (str "check-" (namespace check-key) "-" (name check-key)))
-            check-fn-ns (ns-name *ns*)]
-        (swap! !check-funs conj (symbol check-fn-ns check-fn-name))
-        `(defn ~check-fn-name []
-           ~(macro-common/expand-check check-key body))))))
+  (when (check-ns? &env)
+    (let [check-fn-name (gensym "check-")
+          check-fn-ns (get-in &env [:nses :current-ns])]
+      (swap! !check-funs assoc check-key (symbol (name check-fn-ns) (name check-fn-name)))
+      #?(:cljd/clj-host
+         (binding [macro-common/*expand-host* :cljd]
+           `(defn ~check-fn-name []
+              ~(macro-common/expand-check check-key body)))))))
+
+(defmacro samps
+  [gen-key & {:as gen-opts}]
+  #?(:cljd/clj-host
+     (binding [macro-common/*expand-host* :cljd]
+       (macro-common/expand-samps gen-key gen-opts))))
+
+(defmacro samp
+  [gen-key & {:as gen-opts}]
+  #?(:cljd/clj-host
+     (binding [macro-common/*expand-host* :cljd]
+       (macro-common/expand-samp gen-key gen-opts))))
 
 (defmacro when-check
   [& body]
-  (when (macro-common/check-ns? (str *ns*))
+  (when (check-ns? &env)
     `(do ~@body)))
 
 (defmacro run
@@ -37,7 +53,8 @@
      ~@(map
          (fn [fun-sym]
            `(~fun-sym))
-         @!check-funs)))
+         (vals @!check-funs))
+     nil))
 
 (defn expect
   [f & args]

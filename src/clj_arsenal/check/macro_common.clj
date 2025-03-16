@@ -65,7 +65,7 @@
 (defn expand-check
   [check-key body]
   `(do
-     (swap! common/!status assoc ~check-key ::check/pending)
+     (swap! check/!status assoc ~check-key ::check/pending)
      ~(expand-chain-forms
         body
         `{::check/key ~check-key

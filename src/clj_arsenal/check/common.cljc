@@ -1,27 +1,26 @@
 (ns ^:no-doc clj-arsenal.check.common
   (:require
-   [clj-arsenal.check :as-alias check]
    [clj-arsenal.log :refer [log]]
    [clj-arsenal.basis :as b]
    [clojure.string :as str]))
 
-(def !status (atom {}))
+(defonce !status (atom {}))
 
 (defn default-reporter
   [report]
-  (when (= (::check/status report) ::check/failure)
-    (log :error :msg "Check Failed" :ex (::check/error report))))
+  (when (= (:clj-arsenal.check/status report) :clj-arsenal.check/failure)
+    (log :error :msg "Check Failed" :ex (:clj-arsenal.check/error report))))
 
 (defn report
   [context]
-  (let [status (if (some? (::check/error context)) ::check/failure ::check/success)]
-    ((::check/reporter context)
+  (let [status (if (some? (:clj-arsenal.check/error context)) :clj-arsenal.check/failure :clj-arsenal.check/success)]
+    ((:clj-arsenal.check/reporter context)
      (cond->
-       {::check/status status
-        ::check/key (::check/key context)}
-       (= ::check/failure status)
-       (assoc ::check/error (::check/error context))))
-    (swap! !status assoc (::check/key context) status)))
+       {:clj-arsenal.check/status status
+        :clj-arsenal.check/key (:clj-arsenal.check/key context)}
+       (= :clj-arsenal.check/failure status)
+       (assoc :clj-arsenal.check/error (:clj-arsenal.check/error context))))
+    (swap! !status assoc (:clj-arsenal.check/key context) status)))
 
 (defn await-all-checks
   []
@@ -33,11 +32,13 @@
          on-status
          (fn [status]
            (let
-             [{passed ::check/success failed ::check/failure pending ::check/pending}
+             [{passed :clj-arsenal.check/success
+               failed :clj-arsenal.check/failure
+               pending :clj-arsenal.check/pending}
               (group-by val status)]
              (when (empty? pending)
                (remove-watch !status watch-key)
-               (continue {::check/passed (map key passed) ::check/failed (map key failed)}))))]
+               (continue {:clj-arsenal.check/passed (map key passed) :clj-arsenal.check/failed (map key failed)}))))]
         (add-watch !status watch-key (fn [_ _ _ status] (on-status status)))
         (on-status @!status)))))
 
@@ -45,7 +46,7 @@
   []
   (b/chain
     (await-all-checks)
-    (fn [{passed ::check/passed failed ::check/failed :as x}]
+    (fn [{passed :clj-arsenal.check/passed failed :clj-arsenal.check/failed :as x}]
       (cond
         (seq failed)
         (do
