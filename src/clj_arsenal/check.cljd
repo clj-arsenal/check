@@ -22,7 +22,7 @@
 (defmacro check
   [check-key & body]
   (when (check-ns? &env)
-    (let [check-fn-name (gensym "check-")
+    (let [check-fn-name (or (get @!check-funs check-key) (gensym "check-"))
           check-fn-ns (get-in &env [:nses :current-ns])]
       (swap! !check-funs assoc check-key (symbol (name check-fn-ns) (name check-fn-name)))
       #?(:cljd/clj-host
@@ -61,7 +61,7 @@
   (when-not (apply f args)
     (throw
       (b/err
-        :id ::expectation-unsatisfied
+        :p ::expectation-unsatisfied
         :msg "Expectation Unsatisfied"
         ::expect-fun (str f)
         ::expect-args args))))

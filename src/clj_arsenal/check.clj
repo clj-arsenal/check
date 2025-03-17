@@ -36,7 +36,7 @@
   (when-not (apply f args)
     (throw
       (b/err
-        :id ::expectation-unsatisfied
+        :p ::expectation-unsatisfied
         :msg "Expectation Unsatisfied"
         ::expect-fun (cond-> (str f) (fn? f) repl/demunge)
         ::expect-args args))))
