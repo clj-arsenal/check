@@ -1,6 +1,6 @@
 (ns ^:no-doc clj-arsenal.check.common
   (:require
-   [clj-arsenal.log :refer [log]]
+   [clj-arsenal.log :refer [log] :as log]
    [clj-arsenal.basis :as b]
    [clojure.string :as str]))
 
@@ -9,7 +9,10 @@
 (defn default-reporter
   [report]
   (when (= (:clj-arsenal.check/status report) :clj-arsenal.check/failure)
-    (log :error :msg "Check Failed" :ex (:clj-arsenal.check/error report))))
+    (log :error
+      :msg (str "Check Failed " (:clj-arsenal.check/key report))
+      :ex (:clj-arsenal.check/error report)
+      ::log/skip-loc true)))
 
 (defn report
   [context]
