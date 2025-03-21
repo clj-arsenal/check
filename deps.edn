@@ -1,7 +1,14 @@
-{:paths ["src"]
+{:paths
+ ["src"]
+
  :deps
- {me.raystubbs.clj-arsenal/basis {:mvn/version "0.0.1"}
-  me.raystubbs.clj-arsenal/log {:mvn/version "0.0.1"}}
+ {me.raystubbs.clj-arsenal/basis
+  {:git/url "https://github.com/clj-arsenal/basis.git"
+   :git/sha "6641f8c220cc1ef5b29cdec1b552414ab8dbf104"}
+
+  me.raystubbs.clj-arsenal/log
+  {:git/url "https://github.com/clj-arsenal/log.git"
+   :git/sha "6f49191729472c1d75c9074e17fa53c74ace84c3"}}
 
  :aliases
  {:build
