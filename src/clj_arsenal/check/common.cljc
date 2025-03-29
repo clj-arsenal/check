@@ -59,10 +59,11 @@
             "\u001b[31mThe following checks failed:\n"
             (str/join "\n" (map #(str "  " %) failed))
             "\n\u001b[0m\n")
-          #?(:clj (flush))
+          #?(:cljd nil :clj (flush))
           #?(:cljd (io/exit 1) :clj (System/exit 1) :cljs (js/process.exit 1)))
         
         :else
         (do
           (print "\u001b[32mAll " (count passed) " checks passed.\n\u001b[0m")
+          #?(:cljd nil :clj (flush))
           #?(:cljd (io/exit 0) :clj (System/exit 0) :cljs (js/process.exit 0)))))))
