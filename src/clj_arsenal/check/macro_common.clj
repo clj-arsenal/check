@@ -44,7 +44,7 @@
 
 (defn expand-samp
   [gen-key gen-opts]
-  `(clojure.core/first (samps ~gen-key ~(assoc (merge gen-opts {:seed gen-seed}) :limit 1))))
+  `(clojure.core/first ~(expand-samps gen-key (assoc (merge gen-opts {:seed gen-seed}) :limit 1))))
 
 (defn expand-chain-forms
   [forms context callback]
