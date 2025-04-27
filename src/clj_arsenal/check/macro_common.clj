@@ -38,9 +38,11 @@
 
 (defn expand-samps
   [gen-key gen-opts]
-  (walk/postwalk
-    (fn [x] (cond->> x (seq? x) (cons 'list)))
-    ((requiring-resolve (generators gen-key)) (merge {:seed gen-seed} gen-opts))))
+  ;; cljd seems to fk with *reader-resolver* and break things
+  (binding [*reader-resolver* nil]
+    (walk/postwalk
+      (fn [x] (cond->> x (seq? x) (cons 'list)))
+      ((requiring-resolve (generators gen-key)) (merge {:seed gen-seed} gen-opts)))))
 
 (defn expand-samp
   [gen-key gen-opts]
